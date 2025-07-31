@@ -1,0 +1,61 @@
+#!/sbin/openrc-run
+
+name="Monitorix"
+description="A lightweight system monitoring tool"
+command="/usr/bin/monitorix"
+command_args="-c /etc/monitorix/monitorix.conf"
+command_background=true
+pidfile="/var/run/monitorix.pid"
+start_stop_daemon_args="--exec $command -- $command_args"
+
+depend() {
+    need net
+    use logger
+    after firewall
+}
+
+start_pre() {
+    checkpath --directory --mode 0755 \
+        /var/lib/monitorix/www  || return 1
+    ebegin "Creating required directories"
+    eend $?
+}
+
+start() {
+    ebegin "Starting $name"
+    start-stop-daemon --start \
+        --exec "$command" \
+        --pidfile "$pidfile" \
+        --make-pidfile \
+        --background \
+        -- $command_args
+    eend $?
+}
+
+stop() {
+    ebegin "Stopping $name"
+    start-stop-daemon --stop \
+        --exec "$command" \
+        --pidfile "$pidfile"
+    eend $?
+    rm -f "$pidfile" 2>/dev/null
+}
+
+restart() {
+    stop
+    sleep 1
+    start
+}
+
+status() {
+    ebegin "Checking status of $name"
+    if [ -f "$pidfile" ]; then
+        if kill -0 $(cat "$pidfile") 2>/dev/null; then
+            eend 0 "$name is running (PID $(cat "$pidfile"))."
+        else
+            eend 1 "$name PID file exists but process is not running."
+        fi
+    else
+        eend 1 "$name is not running."
+    fi
+}
